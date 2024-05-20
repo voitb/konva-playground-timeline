@@ -1,25 +1,23 @@
-import logo from './logo.svg';
-import './App.css';
+import Konva from "konva";
+import "./App.css";
+import KonvaS from "./Konva";
+import KonvaOld from "./KonvaOld";
+import KonvaWaveform from "./KonvaWaveform";
+import Waveform from "./Waveform";
+import WaveformGenerator from "./WaveformComplete";
+import StageContainer from "./components/StageContainer";
 
 function App() {
-  return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
-  );
+	return (
+		<div className="App">
+			{/* <KonvaS /> */}
+			{/* <Waveform /> */}
+			{/* <WaveformGenerator /> */}
+			{/* <KonvaWaveform /> */}
+			<StageContainer />
+			{/* <KonvaOld /> */}
+		</div>
+	);
 }
 
 export default App;
