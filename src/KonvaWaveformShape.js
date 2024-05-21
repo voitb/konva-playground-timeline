@@ -5,230 +5,180 @@ const WaveformGenerator = ({ layer }) => {
 	const drawWaveform = (arrayBuffer) => {
 		const context = new (window.AudioContext || window.webkitAudioContext)();
 		context.decodeAudioData(arrayBuffer, (buffer) => {
-			const rawData = buffer.getChannelData(0); // Get the first channel
-			const samples = 500; // Number of samples to visualize
-			const blockSize = Math.floor(rawData.length / samples); // Number of samples in each block
+			const rawData = buffer.getChannelData(0);
+			const samples = 500;
+			const blockSize = Math.floor(rawData.length / samples);
 			const filteredData = [];
+
 			for (let i = 0; i < samples; i++) {
 				filteredData.push(rawData[i * blockSize]);
 			}
+
+			const maxHeight = 200;
 			const normalizedData = filteredData.map(
 				(n) => n / Math.max(...filteredData)
 			);
 
-			// Create an offscreen canvas to draw the waveform
-			const offscreenCanvas = document.createElement("canvas");
-			offscreenCanvas.width = 600; // You can adjust the width
-			offscreenCanvas.height = 200; // You can adjust the height
-			const offscreenCtx = offscreenCanvas.getContext("2d");
-
-			// Draw the waveform on the offscreen canvas
-			offscreenCtx.clearRect(
-				0,
-				0,
-				offscreenCanvas.width,
-				offscreenCanvas.height
-			);
-			offscreenCtx.fillStyle = "rgb(200, 200, 200)";
-			offscreenCtx.fillRect(
-				0,
-				0,
-				offscreenCanvas.width,
-				offscreenCanvas.height
-			);
-			offscreenCtx.lineWidth = 2;
-			offscreenCtx.strokeStyle = "rgb(0, 0, 0)";
-			offscreenCtx.beginPath();
-
-			const sliceWidth = offscreenCanvas.width / samples;
-			let x = 0;
-			normalizedData.forEach((value, index) => {
-				const y = ((1 - value) * offscreenCanvas.height) / 2;
-				if (index === 0) {
-					offscreenCtx.moveTo(x, y);
-				} else {
-					offscreenCtx.lineTo(x, y);
-				}
-				x += sliceWidth;
+			const frameWidth = normalizedData.length;
+			const waveformGroup = new Konva.Group({
+				x: 10,
+				y: 10,
+				draggable: true,
+				width: frameWidth,
 			});
-			offscreenCtx.lineTo(offscreenCanvas.width, offscreenCanvas.height / 2);
-			offscreenCtx.stroke();
 
-			// Convert the offscreen canvas to an image
-			const waveformImg = new window.Image();
-			waveformImg.src = offscreenCanvas.toDataURL();
-
-			waveformImg.onload = function () {
-				const spriteHeight = waveformImg.height;
-
-				const image = new Konva.Image({
-					image: waveformImg,
-					x: 100, // Initial x position
-					y: 100, // Initial y position
-					width: waveformImg.width,
-					height: spriteHeight,
-					crop: {
-						x: 0,
-						y: 0,
-						width: waveformImg.width,
-						height: spriteHeight,
-					},
-					draggable: true,
-					dragBoundFunc: function (pos) {
-						// Restrict movement within the canvas
-						const newX = Math.max(
-							0,
-							Math.min(layer.getStage().width() - image.width(), pos.x)
-						);
-						const newY = Math.max(
-							0,
-							Math.min(layer.getStage().height() - image.height(), pos.y)
-						);
-						return {
-							x: newX,
-							y: newY,
-						};
-					},
+			normalizedData.forEach((value, index) => {
+				const rectHeight = (value + 1) * (maxHeight / 2);
+				const rect = new Konva.Rect({
+					x: index,
+					y: maxHeight / 2 - rectHeight / 2,
+					width: 1,
+					height: rectHeight,
+					fill: "black",
 				});
+				waveformGroup.add(rect);
+			});
 
-				const updateAnchors = () => {
-					anchorRight.x(image.x() + image.width() - 10);
-					anchorRight.y(image.y());
-					anchorRight.height(image.height());
+			const frame = new Konva.Rect({
+				stroke: "blue",
+				strokeWidth: 2,
+				x: 0,
+				y: 0,
+				width: frameWidth,
+				height: maxHeight,
+			});
+			waveformGroup.add(frame);
 
-					anchorLeft.x(image.x());
-					anchorLeft.y(image.y());
-					anchorLeft.height(image.height());
-				};
+			frame.moveToBottom();
 
-				// Add hover effect
-				image.on("mouseover", function () {
-					image.stroke("red");
-					image.strokeWidth(5);
-					layer.draw();
-				});
+			const updateAnchors = () => {
+				anchorRight.x(waveformGroup.x() + waveformGroup.width());
+				anchorRight.y(waveformGroup.y());
 
-				image.on("mouseout", function () {
-					image.stroke(null);
-					image.strokeWidth(0);
-					layer.draw();
-				});
+				anchorLeft.x(waveformGroup.x() - 10);
+				anchorLeft.y(waveformGroup.y());
+			};
 
-				// Bring to top on drag
-				image.on("dragstart", function () {
-					image.moveToTop();
-					anchorRight.moveToTop();
-					anchorLeft.moveToTop();
-					layer.draw();
-				});
+			const cropWaveform = () => {
+				const startX = Math.max(0, anchorLeft.x() - waveformGroup.x() + 10);
+				const endX = Math.min(frameWidth, anchorRight.x() - waveformGroup.x());
+				const croppedData = normalizedData.slice(startX, endX);
 
-				image.on("dragmove", function () {
-					updateAnchors();
-					layer.draw();
-				});
-
-				image.on("dragend", function () {
-					updateAnchors();
-					layer.draw();
-				});
-
-				const anchorRight = new Konva.Rect({
-					x: image.x() + image.width() - 10,
-					y: image.y(),
-					width: 10,
-					height: spriteHeight,
-					fill: "red",
-					opacity: 0.5,
-					draggable: true,
-					dragBoundFunc: function (pos) {
-						image.moveToTop();
-						anchorRight.moveToTop();
-						anchorLeft.moveToTop();
-
-						const maxWidth = image.attrs.image.width; // Get the original width of the image
-						const newWidth =
-							maxWidth < pos.x - image.x() ? maxWidth : pos.x - image.x(); // Calculate new width
-						const newX = Math.min(pos.x, image.x() + maxWidth);
-
-						console.log(newX, newWidth);
-
-						if (newWidth < 30) return { x: image.x() + 30, y: this.y() }; // Prevent shrinking below 30px
-
-						image.width(newWidth);
-						image.crop({
-							x: image.crop().x,
-							y: 0,
-							width: newWidth,
-							height: spriteHeight,
-						});
-						updateAnchors();
-						layer.draw();
-						return {
-							x: newX,
-							y: this.y(), // Constrain vertical movement
-						};
-					},
-				});
-
-				const anchorLeft = new Konva.Rect({
-					x: image.x(),
-					y: image.y(),
-					width: 10,
-					height: spriteHeight,
-					fill: "red",
-					opacity: 0.5,
-					draggable: true,
-					dragBoundFunc: function (pos) {
-						image.moveToTop();
-						anchorLeft.moveToTop();
-						anchorRight.moveToTop();
-
-						// Calculate new width based on the left anchor's new position
-						const newWidth = image.width() + (image.x() - pos.x);
-						const newX = Math.max(0, pos.x);
-
-						// Prevent expanding the image beyond its initial dimensions
-						if (newX >= image.x() + image.width()) {
-							return { x: image.x(), y: this.y() };
+				waveformGroup.getChildren().forEach((child) => {
+					if (child instanceof Konva.Rect && child !== frame) {
+						const index = child.x();
+						if (index < startX || index > endX) {
+							child.visible(false);
+						} else {
+							child.visible(true);
 						}
-
-						// Prevent shrinking below 30px
-						if (newWidth < 30) {
-							return { x: image.x() + image.width() - 30, y: this.y() };
-						}
-
-						const newCropX = pos.x - image.x() + image.crop().x;
-
-						// Ensure the new crop x does not exceed the initial width of the image
-						if (newCropX < 0) {
-							return { x: image.x(), y: this.y() };
-						}
-
-						// Update the image's width and crop settings
-						image.width(newWidth);
-						image.crop({
-							x: newCropX,
-							y: 0,
-							width: newWidth,
-							height: spriteHeight,
-						});
-
-						image.x(pos.x);
-						updateAnchors();
-						layer.draw();
-
-						return {
-							x: pos.x,
-							y: this.y(), // Constrain vertical movement
-						};
-					},
+					}
 				});
 
-				layer.add(image);
-				layer.add(anchorRight);
-				layer.add(anchorLeft);
+				frame.width(endX - startX);
+				waveformGroup.width(endX - startX);
 				layer.draw();
 			};
+
+			waveformGroup.on("mouseover", function () {
+				frame.stroke("red");
+				layer.draw();
+			});
+
+			waveformGroup.on("mouseout", function () {
+				frame.stroke("blue");
+				layer.draw();
+			});
+
+			waveformGroup.on("dragstart", function () {
+				waveformGroup.moveToTop();
+				anchorRight.moveToTop();
+				anchorLeft.moveToTop();
+				layer.draw();
+			});
+
+			waveformGroup.on("dragmove", function () {
+				updateAnchors();
+				layer.draw();
+			});
+
+			waveformGroup.on("dragend", function () {
+				updateAnchors();
+				layer.draw();
+			});
+
+			layer.add(waveformGroup);
+
+			const anchorRight = new Konva.Rect({
+				x: waveformGroup.x() + frameWidth,
+				y: waveformGroup.y(),
+				width: 10,
+				height: 10,
+				fill: "red",
+				opacity: 0.5,
+				draggable: true,
+				dragBoundFunc: function (pos) {
+					waveformGroup.moveToTop();
+					anchorRight.moveToTop();
+					anchorLeft.moveToTop();
+
+					const maxWidth = frameWidth;
+					const newWidth = Math.min(maxWidth, pos.x - waveformGroup.x());
+					const newX = Math.min(pos.x, waveformGroup.x() + maxWidth);
+
+					if (newWidth < 30) return { x: waveformGroup.x() + 30, y: this.y() };
+
+					frame.width(newWidth);
+					waveformGroup.width(newWidth);
+					updateAnchors();
+					anchorRight.x(waveformGroup.x() + newWidth);
+					layer.draw();
+					cropWaveform();
+					return {
+						x: newX,
+						y: this.y(),
+					};
+				},
+			});
+
+			const anchorLeft = new Konva.Rect({
+				x: waveformGroup.x() - 10,
+				y: waveformGroup.y(),
+				width: 10,
+				height: 10,
+				fill: "red",
+				opacity: 0.5,
+				draggable: true,
+				dragBoundFunc: function (pos) {
+					waveformGroup.moveToTop();
+					anchorLeft.moveToTop();
+					anchorRight.moveToTop();
+
+					const newX = Math.max(0, pos.x);
+					const maxX = anchorRight.x() - 30; // Ensure minimum width of 30
+					const newXClamped = Math.min(newX, maxX);
+					const newWidth = anchorRight.x() - newXClamped;
+
+					waveformGroup.setX(newXClamped); // Move group to new position
+					waveformGroup.width(newWidth); // Adjust the group's width
+					frame.width(newWidth); // Adjust the frame's width
+
+					updateAnchors(); // Update positions of the anchors
+
+					cropWaveform(); // Crop the waveform to reflect the new visible range
+
+					layer.draw(); // Redraw the layer to apply changes
+
+					return {
+						x: newXClamped,
+						y: this.y(),
+					};
+				},
+			});
+
+			layer.add(anchorRight);
+			layer.add(anchorLeft);
+			layer.draw();
 		});
 	};
 
@@ -275,7 +225,7 @@ const KonvaC = () => {
 		const stage = new Konva.Stage({
 			container: containerRef.current,
 			width: window.innerWidth,
-			height: window.innerHeight,
+			height: window.innerHeight / 1.5,
 		});
 
 		const newLayer = new Konva.Layer();
@@ -335,7 +285,7 @@ const KonvaC = () => {
 					anchorRight.y(image.y());
 					anchorRight.height(image.height());
 
-					anchorLeft.x(image.x());
+					anchorLeft.x(image.x() - 10);
 					anchorLeft.y(image.y());
 					anchorLeft.height(image.height());
 				};
@@ -430,7 +380,7 @@ const KonvaC = () => {
 				});
 
 				const anchorLeft = new Konva.Rect({
-					x: 50 * index,
+					x: 50 * index - 10,
 					y: 0,
 					width: 10,
 					height: spriteHeight,

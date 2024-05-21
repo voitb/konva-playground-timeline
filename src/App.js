@@ -6,6 +6,7 @@ import KonvaWaveform from "./KonvaWaveform";
 import Waveform from "./Waveform";
 import WaveformGenerator from "./WaveformComplete";
 import StageContainer from "./components/StageContainer";
+import KonvaWaveformShape from "./KonvaWaveformShape";
 
 function App() {
 	return (
@@ -14,7 +15,8 @@ function App() {
 			{/* <Waveform /> */}
 			{/* <WaveformGenerator /> */}
 			{/* <KonvaWaveform /> */}
-			<StageContainer />
+			<KonvaWaveformShape />
+			{/* <StageContainer /> */}
 			{/* <KonvaOld /> */}
 		</div>
 	);
