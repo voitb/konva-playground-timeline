@@ -1,6 +1,5 @@
 import React, { useRef, useEffect, useState } from "react";
 import Konva from "konva";
-
 const WaveformGenerator = ({ layer }) => {
 	const drawWaveform = (arrayBuffer) => {
 		const context = new (window.AudioContext || window.webkitAudioContext)();
@@ -25,6 +24,12 @@ const WaveformGenerator = ({ layer }) => {
 				y: 10,
 				draggable: true,
 				width: frameWidth,
+				height: maxHeight,
+				clipX: 0,
+				clip: {
+					width: frameWidth,
+					height: maxHeight,
+				},
 			});
 
 			normalizedData.forEach((value, index) => {
@@ -52,7 +57,7 @@ const WaveformGenerator = ({ layer }) => {
 			frame.moveToBottom();
 
 			const updateAnchors = () => {
-				anchorRight.x(waveformGroup.x() + waveformGroup.width());
+				anchorRight.x(waveformGroup.x() + waveformGroup.clipWidth());
 				anchorRight.y(waveformGroup.y());
 
 				anchorLeft.x(waveformGroup.x() - 10);
@@ -62,21 +67,14 @@ const WaveformGenerator = ({ layer }) => {
 			const cropWaveform = () => {
 				const startX = Math.max(0, anchorLeft.x() - waveformGroup.x() + 10);
 				const endX = Math.min(frameWidth, anchorRight.x() - waveformGroup.x());
-				const croppedData = normalizedData.slice(startX, endX);
-
-				waveformGroup.getChildren().forEach((child) => {
-					if (child instanceof Konva.Rect && child !== frame) {
-						const index = child.x();
-						if (index < startX || index > endX) {
-							child.visible(false);
-						} else {
-							child.visible(true);
-						}
-					}
+				waveformGroup.clip({
+					x: startX,
+					y: 0,
+					width: endX - startX,
+					height: maxHeight,
 				});
-
-				frame.width(endX - startX);
 				waveformGroup.width(endX - startX);
+				frame.width(endX - startX);
 				layer.draw();
 			};
 
@@ -122,20 +120,18 @@ const WaveformGenerator = ({ layer }) => {
 					anchorRight.moveToTop();
 					anchorLeft.moveToTop();
 
-					const maxWidth = frameWidth;
+					const maxWidth = pos.x - anchorLeft.x() - 10;
 					const newWidth = Math.min(maxWidth, pos.x - waveformGroup.x());
-					const newX = Math.min(pos.x, waveformGroup.x() + maxWidth);
-
-					if (newWidth < 30) return { x: waveformGroup.x() + 30, y: this.y() };
-
+					if (frameWidth - waveformGroup.clipX() < newWidth)
+						return { x: waveformGroup.x() + frameWidth, y: this.y() };
 					frame.width(newWidth);
-					waveformGroup.width(newWidth);
-					updateAnchors();
-					anchorRight.x(waveformGroup.x() + newWidth);
-					layer.draw();
-					cropWaveform();
+					waveformGroup.clip({
+						x: waveformGroup.clipX(),
+						y: waveformGroup.clipY(),
+						width: newWidth,
+					});
 					return {
-						x: newX,
+						x: pos.x,
 						y: this.y(),
 					};
 				},
@@ -150,27 +146,37 @@ const WaveformGenerator = ({ layer }) => {
 				opacity: 0.5,
 				draggable: true,
 				dragBoundFunc: function (pos) {
+					console.log(pos);
 					waveformGroup.moveToTop();
 					anchorLeft.moveToTop();
 					anchorRight.moveToTop();
 
-					const newX = Math.max(0, pos.x);
-					const maxX = anchorRight.x() - 30; // Ensure minimum width of 30
-					const newXClamped = Math.min(newX, maxX);
-					const newWidth = anchorRight.x() - newXClamped;
+					const newWidth = anchorRight.x() - pos.x - 10;
 
-					waveformGroup.setX(newXClamped); // Move group to new position
-					waveformGroup.width(newWidth); // Adjust the group's width
-					frame.width(newWidth); // Adjust the frame's width
+					const newCropX = pos.x - waveformGroup.x() + 10;
 
-					updateAnchors(); // Update positions of the anchors
+					if (newCropX < 0) {
+						waveformGroup.clip({
+							x: 0,
+							y: 0,
+						});
+						return {
+							x: waveformGroup.x() - 10,
+							y: this.y(),
+						};
+					}
 
-					cropWaveform(); // Crop the waveform to reflect the new visible range
+					frame.x(newCropX);
+					frame.width(newWidth);
+					waveformGroup.clip({
+						x: newCropX,
+						y: 0,
+						width: newWidth,
+					});
 
-					layer.draw(); // Redraw the layer to apply changes
-
+					layer.draw();
 					return {
-						x: newXClamped,
+						x: pos.x,
 						y: this.y(),
 					};
 				},
@@ -206,7 +212,6 @@ const WaveformGenerator = ({ layer }) => {
 
 	return (
 		<div>
-			<h1>Generate Waveform</h1>
 			<input
 				type="text"
 				placeholder="Enter audio URL"
@@ -216,7 +221,6 @@ const WaveformGenerator = ({ layer }) => {
 		</div>
 	);
 };
-
 const KonvaC = () => {
 	const containerRef = useRef(null);
 	const [layer, setLayer] = useState(null);
