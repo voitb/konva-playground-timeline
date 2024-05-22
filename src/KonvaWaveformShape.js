@@ -64,20 +64,6 @@ const WaveformGenerator = ({ layer }) => {
 				anchorLeft.y(waveformGroup.y());
 			};
 
-			const cropWaveform = () => {
-				const startX = Math.max(0, anchorLeft.x() - waveformGroup.x() + 10);
-				const endX = Math.min(frameWidth, anchorRight.x() - waveformGroup.x());
-				waveformGroup.clip({
-					x: startX,
-					y: 0,
-					width: endX - startX,
-					height: maxHeight,
-				});
-				waveformGroup.width(endX - startX);
-				frame.width(endX - startX);
-				layer.draw();
-			};
-
 			waveformGroup.on("mouseover", function () {
 				frame.stroke("red");
 				layer.draw();
@@ -116,24 +102,24 @@ const WaveformGenerator = ({ layer }) => {
 				opacity: 0.5,
 				draggable: true,
 				dragBoundFunc: function (pos) {
-					waveformGroup.moveToTop();
-					anchorRight.moveToTop();
-					anchorLeft.moveToTop();
+					const newX = Math.min(pos.x, waveformGroup.x() + frameWidth);
+					const newPos = { x: newX, y: this.y() };
 
-					const maxWidth = pos.x - anchorLeft.x() - 10;
-					const newWidth = Math.min(maxWidth, pos.x - waveformGroup.x());
-					if (frameWidth - waveformGroup.clipX() < newWidth)
-						return { x: waveformGroup.x() + frameWidth, y: this.y() };
+					if (newPos.x <= anchorLeft.x() + 10) {
+						return { x: anchorLeft.x() + 10, y: this.y() };
+					}
+
+					const maxWidth = newPos.x - anchorLeft.x() - 10;
+					const newWidth = Math.min(maxWidth, newPos.x - waveformGroup.x());
+
 					frame.width(newWidth);
 					waveformGroup.clip({
 						x: waveformGroup.clipX(),
 						y: waveformGroup.clipY(),
 						width: newWidth,
 					});
-					return {
-						x: pos.x,
-						y: this.y(),
-					};
+
+					return newPos;
 				},
 			});
 
@@ -146,14 +132,15 @@ const WaveformGenerator = ({ layer }) => {
 				opacity: 0.5,
 				draggable: true,
 				dragBoundFunc: function (pos) {
-					console.log(pos);
-					waveformGroup.moveToTop();
-					anchorLeft.moveToTop();
-					anchorRight.moveToTop();
+					const newX = Math.max(pos.x, waveformGroup.x() - 10);
+					const newPos = { x: newX, y: this.y() };
 
-					const newWidth = anchorRight.x() - pos.x - 10;
+					if (newPos.x >= anchorRight.x() - 10) {
+						return { x: anchorRight.x() - 10, y: this.y() };
+					}
 
-					const newCropX = pos.x - waveformGroup.x() + 10;
+					const newWidth = anchorRight.x() - newPos.x - 10;
+					const newCropX = newPos.x - waveformGroup.x() + 10;
 
 					if (newCropX < 0) {
 						waveformGroup.clip({
@@ -174,11 +161,7 @@ const WaveformGenerator = ({ layer }) => {
 						width: newWidth,
 					});
 
-					layer.draw();
-					return {
-						x: pos.x,
-						y: this.y(),
-					};
+					return newPos;
 				},
 			});
 
@@ -221,6 +204,7 @@ const WaveformGenerator = ({ layer }) => {
 		</div>
 	);
 };
+
 const KonvaC = () => {
 	const containerRef = useRef(null);
 	const [layer, setLayer] = useState(null);
