@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from "react";
 import Konva from "konva";
-const WaveformGenerator = ({ layer }) => {
+const WaveformGenerator = ({ stage, layer }) => {
 	const drawWaveform = (arrayBuffer) => {
 		const context = new (window.AudioContext || window.webkitAudioContext)();
 		context.decodeAudioData(arrayBuffer, (buffer) => {
@@ -57,13 +57,12 @@ const WaveformGenerator = ({ layer }) => {
 			frame.moveToBottom();
 
 			const updateAnchors = () => {
-				anchorRight.x(
-					waveformGroup.x() + waveformGroup.clipWidth() + waveformGroup.clipX()
-				);
-				anchorRight.y(waveformGroup.y());
-
-				anchorLeft.x(waveformGroup.x() + waveformGroup.clipX() - 10);
-				anchorLeft.y(waveformGroup.y());
+				// anchorRight.x(
+				// 	waveformGroup.x() + waveformGroup.clipWidth() + waveformGroup.clipX()
+				// );
+				// anchorRight.y(waveformGroup.y());
+				// anchorLeft.x(waveformGroup.x() + waveformGroup.clipX() - 10);
+				// anchorLeft.y(waveformGroup.y());
 			};
 
 			waveformGroup.on("mouseover", function () {
@@ -93,98 +92,81 @@ const WaveformGenerator = ({ layer }) => {
 				layer.draw();
 			});
 
-			layer.add(waveformGroup);
-
 			const anchorRight = new Konva.Rect({
-				x: waveformGroup.x() + frameWidth,
-				y: waveformGroup.y(),
+				x: frameWidth - 10,
+				y: 0,
 				width: 10,
 				height: 10,
 				fill: "red",
 				opacity: 0.5,
 				draggable: true,
-				dragBoundFunc: function (pos) {
-					const newX = Math.min(pos.x, waveformGroup.x() + frameWidth);
-					const newPos = { x: newX, y: this.y() };
-					const maxWidth = newPos.x - anchorLeft.x() - 10;
-					const newWidth = Math.min(maxWidth, newPos.x - waveformGroup.x());
-
-					if (newPos.x <= anchorLeft.x() + 20) {
-						frame.width(10);
-						waveformGroup.clip({
-							x: 0,
-							y: waveformGroup.clipY(),
-							width: 10,
-						});
-						return { x: anchorLeft.x() + 20, y: this.y() };
-					}
-
-					frame.width(newWidth);
-					waveformGroup.clip({
-						x: waveformGroup.clipX(),
-						y: waveformGroup.clipY(),
-						width: newWidth,
-					});
-					return newPos;
-				},
 			});
 
 			const anchorLeft = new Konva.Rect({
-				x: waveformGroup.x() - 10,
-				y: waveformGroup.y(),
+				x: 0,
+				y: 0,
 				width: 10,
 				height: 10,
 				fill: "red",
 				opacity: 0.5,
 				draggable: true,
-				dragBoundFunc: function (pos) {
-					const newX = Math.max(pos.x, waveformGroup.x() - 10);
-					const newPos = { x: newX, y: this.y() };
-
-					const newWidth = anchorRight.x() - newPos.x - 10;
-					const newCropX = newPos.x - waveformGroup.x() + 10;
-					console.log(newCropX, newPos, pos.x);
-
-					console.log(
-						{ newX, anchorRight, frame, newCropX, newPos, waveformGroup },
-						pos.x
-					);
-					if (newPos.x >= anchorRight.x() - 20) {
-						frame.x(anchorRight.x() - 20 + waveformGroup.clipX() - 10);
-						frame.width(10);
-						waveformGroup.clip({
-							y: 0,
-							width: 20,
-						});
-						return { x: anchorRight.x() - 20, y: this.y() };
-					}
-
-					frame.x(newCropX);
-					frame.width(newWidth);
-
-					if (newCropX < 0) {
-						waveformGroup.clip({
-							x: 0,
-							y: 0,
-						});
-						return {
-							x: waveformGroup.x() - 10,
-							y: this.y(),
-						};
-					}
-
-					waveformGroup.clip({
-						x: newCropX,
-						y: 0,
-						width: newWidth,
-					});
-
-					return newPos;
-				},
 			});
 
-			layer.add(anchorRight);
-			layer.add(anchorLeft);
+			waveformGroup.add(anchorRight);
+			waveformGroup.add(anchorLeft);
+
+			anchorRight.on("dragmove", function (pos) {
+				anchorRight.y(0);
+
+				if (anchorRight.position().x >= waveformGroup.width()) {
+					frame.width(waveformGroup.width() - waveformGroup.clipX());
+					anchorRight.x(waveformGroup.width() - 10);
+					waveformGroup.clip({
+						width: 500,
+					});
+					return;
+				}
+				if (anchorRight.position().x - anchorLeft.position().x <= 20) {
+					frame.width(30);
+					anchorRight.x(20);
+					waveformGroup.clip({
+						width: 30,
+					});
+					return;
+				}
+				frame.width(anchorRight.position().x + 10 - waveformGroup.clipX());
+				waveformGroup.clip({
+					width: anchorRight.position().x + 10 - waveformGroup.clipX(),
+				});
+			});
+
+			anchorLeft.on("dragmove", function (pos) {
+				anchorLeft.y(0);
+
+				if (anchorLeft.position().x <= 0) {
+					frame.x(0);
+					frame.width(500);
+					anchorLeft.x(0);
+					waveformGroup.clipX(0);
+					return;
+				}
+				if (anchorRight.position().x - anchorLeft.position().x <= 20) {
+					frame.width(30);
+					frame.x(470);
+					anchorLeft.x(470);
+					waveformGroup.clip({
+						x: 470,
+					});
+					return;
+				}
+				frame.x(anchorLeft.position().x);
+				frame.width(anchorRight.position().x + 10 - anchorLeft.position().x);
+				waveformGroup.clip({
+					x: anchorLeft.position().x,
+					width: anchorRight.position().x + 10 - anchorLeft.position().x,
+				});
+			});
+			layer.add(waveformGroup);
 			layer.draw();
 		});
 	};
@@ -226,6 +208,7 @@ const WaveformGenerator = ({ layer }) => {
 const KonvaC = () => {
 	const containerRef = useRef(null);
 	const [layer, setLayer] = useState(null);
+	const [stage, setStage] = useState(null);
 
 	useEffect(() => {
 		const stage = new Konva.Stage({
@@ -233,6 +216,7 @@ const KonvaC = () => {
 			width: window.innerWidth,
 			height: window.innerHeight / 1.5,
 		});
+		setStage(stage);
 
 		const newLayer = new Konva.Layer();
 		setLayer(newLayer);
@@ -452,7 +436,7 @@ const KonvaC = () => {
 	return (
 		<div>
 			<div ref={containerRef} id="container" />
-			{layer && <WaveformGenerator layer={layer} />}
+			{layer && <WaveformGenerator stage={stage} layer={layer} />}
 		</div>
 	);
 };

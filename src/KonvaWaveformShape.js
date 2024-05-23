@@ -57,10 +57,12 @@ const WaveformGenerator = ({ layer }) => {
 			frame.moveToBottom();
 
 			const updateAnchors = () => {
-				anchorRight.x(waveformGroup.x() + waveformGroup.clipWidth());
+				anchorRight.x(
+					waveformGroup.x() + waveformGroup.clipWidth() + waveformGroup.clipX()
+				);
 				anchorRight.y(waveformGroup.y());
 
-				anchorLeft.x(waveformGroup.x() - 10);
+				anchorLeft.x(waveformGroup.x() + waveformGroup.clipX() - 10);
 				anchorLeft.y(waveformGroup.y());
 			};
 
@@ -104,13 +106,13 @@ const WaveformGenerator = ({ layer }) => {
 				dragBoundFunc: function (pos) {
 					const newX = Math.min(pos.x, waveformGroup.x() + frameWidth);
 					const newPos = { x: newX, y: this.y() };
-
-					if (newPos.x <= anchorLeft.x() + 10) {
-						return { x: anchorLeft.x() + 10, y: this.y() };
-					}
-
 					const maxWidth = newPos.x - anchorLeft.x() - 10;
 					const newWidth = Math.min(maxWidth, newPos.x - waveformGroup.x());
+
+					if (newPos.x <= anchorLeft.x() + 20) {
+						frame.width(10);
+						return { x: anchorLeft.x() + 20, y: this.y() };
+					}
 
 					frame.width(newWidth);
 					waveformGroup.clip({
@@ -118,13 +120,12 @@ const WaveformGenerator = ({ layer }) => {
 						y: waveformGroup.clipY(),
 						width: newWidth,
 					});
-
 					return newPos;
 				},
 			});
 
 			const anchorLeft = new Konva.Rect({
-				x: waveformGroup.x() - 10,
+				x: waveformGroup.x(),
 				y: waveformGroup.y(),
 				width: 10,
 				height: 10,
@@ -135,12 +136,16 @@ const WaveformGenerator = ({ layer }) => {
 					const newX = Math.max(pos.x, waveformGroup.x() - 10);
 					const newPos = { x: newX, y: this.y() };
 
-					if (newPos.x >= anchorRight.x() - 10) {
-						return { x: anchorRight.x() - 10, y: this.y() };
-					}
-
 					const newWidth = anchorRight.x() - newPos.x - 10;
 					const newCropX = newPos.x - waveformGroup.x() + 10;
+					console.log(frame, waveformGroup, anchorRight, anchorLeft);
+					if (newPos.x >= anchorRight.x() - 20) {
+						frame.width(10);
+						return { x: anchorRight.x() - 20, y: this.y() };
+					}
+
+					frame.x(newCropX);
+					frame.width(newWidth);
 
 					if (newCropX < 0) {
 						waveformGroup.clip({
@@ -153,8 +158,6 @@ const WaveformGenerator = ({ layer }) => {
 						};
 					}
 
-					frame.x(newCropX);
-					frame.width(newWidth);
 					waveformGroup.clip({
 						x: newCropX,
 						y: 0,
