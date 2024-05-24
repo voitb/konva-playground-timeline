@@ -1,8 +1,105 @@
 import React, { useRef, useEffect, useState } from "react";
 import Konva from "konva";
+
+class AnchorHandler {
+	constructor(group) {
+		this.group = group;
+		this.frame = this.createFrame();
+		this.anchorRight = this.createAnchor(group.width() - 10, 0);
+		this.anchorLeft = this.createAnchor(0, 0);
+
+		this.initAnchors();
+	}
+
+	createFrame() {
+		const frame = new Konva.Rect({
+			stroke: "blue",
+			strokeWidth: 2,
+			x: 0,
+			y: 0,
+			width: this.group.width(),
+			height: this.group.height(),
+		});
+		this.group.add(frame);
+		frame.moveToBottom();
+		return frame;
+	}
+
+	createAnchor(x, y) {
+		const anchor = new Konva.Rect({
+			x: x,
+			y: y,
+			width: 10,
+			height: 10,
+			fill: "red",
+			opacity: 0.5,
+			draggable: true,
+		});
+		this.group.add(anchor);
+		return anchor;
+	}
+
+	initAnchors() {
+		this.anchorRight.on("dragmove", () => {
+			this.handleRightDrag();
+		});
+
+		this.anchorLeft.on("dragmove", () => {
+			this.handleLeftDrag();
+		});
+	}
+
+	handleRightDrag() {
+		this.anchorRight.y(0);
+
+		if (this.anchorRight.position().x >= this.group.width()) {
+			this.anchorRight.x(this.group.width() - 10);
+		}
+
+		if (this.anchorRight.position().x - this.anchorLeft.position().x <= 20) {
+			this.anchorRight.x(this.anchorLeft.position().x + 20);
+		}
+
+		this.frame.width(this.anchorRight.position().x + 10 - this.group.clipX());
+		this.group.clip({
+			width: this.anchorRight.position().x + 10 - this.group.clipX(),
+		});
+	}
+
+	handleLeftDrag() {
+		this.anchorLeft.y(0);
+
+		if (this.anchorLeft.position().x <= 0) {
+			this.anchorLeft.x(0);
+		}
+
+		if (this.anchorRight.position().x - this.anchorLeft.position().x <= 20) {
+			this.anchorLeft.x(this.anchorRight.position().x - 20);
+		}
+
+		this.frame.x(this.anchorLeft.position().x);
+		this.frame.width(
+			this.anchorRight.position().x + 10 - this.anchorLeft.position().x
+		);
+		this.group.clip({
+			x: this.anchorLeft.position().x,
+			width: this.anchorRight.position().x + 10 - this.anchorLeft.position().x,
+		});
+	}
+
+	getElements() {
+		return {
+			frame: this.frame,
+			anchorRight: this.anchorRight,
+			anchorLeft: this.anchorLeft,
+		};
+	}
+}
+
 const WaveformGenerator = ({ stage, layer }) => {
 	const drawWaveform = (arrayBuffer) => {
 		const context = new (window.AudioContext || window.webkitAudioContext)();
+
 		context.decodeAudioData(arrayBuffer, (buffer) => {
 			const rawData = buffer.getChannelData(0);
 			const samples = 500;
@@ -32,6 +129,10 @@ const WaveformGenerator = ({ stage, layer }) => {
 				},
 			});
 
+			const anchorHandler = new AnchorHandler(waveformGroup);
+
+			const { frame, anchorRight, anchorLeft } = anchorHandler.getElements();
+
 			normalizedData.forEach((value, index) => {
 				const rectHeight = (value + 1) * (maxHeight / 2);
 				const rect = new Konva.Rect({
@@ -43,27 +144,6 @@ const WaveformGenerator = ({ stage, layer }) => {
 				});
 				waveformGroup.add(rect);
 			});
-
-			const frame = new Konva.Rect({
-				stroke: "blue",
-				strokeWidth: 2,
-				x: 0,
-				y: 0,
-				width: frameWidth,
-				height: maxHeight,
-			});
-			waveformGroup.add(frame);
-
-			frame.moveToBottom();
-
-			const updateAnchors = () => {
-				// anchorRight.x(
-				// 	waveformGroup.x() + waveformGroup.clipWidth() + waveformGroup.clipX()
-				// );
-				// anchorRight.y(waveformGroup.y());
-				// anchorLeft.x(waveformGroup.x() + waveformGroup.clipX() - 10);
-				// anchorLeft.y(waveformGroup.y());
-			};
 
 			waveformGroup.on("mouseover", function () {
 				frame.stroke("red");
@@ -83,89 +163,15 @@ const WaveformGenerator = ({ stage, layer }) => {
 			});
 
 			waveformGroup.on("dragmove", function () {
-				updateAnchors();
 				layer.draw();
 			});
 
 			waveformGroup.on("dragend", function () {
-				updateAnchors();
 				layer.draw();
-			});
-
-			const anchorRight = new Konva.Rect({
-				x: frameWidth - 10,
-				y: 0,
-				width: 10,
-				height: 10,
-				fill: "red",
-				opacity: 0.5,
-				draggable: true,
-			});
-
-			const anchorLeft = new Konva.Rect({
-				x: 0,
-				y: 0,
-				width: 10,
-				height: 10,
-				fill: "red",
-				opacity: 0.5,
-				draggable: true,
 			});
 
 			waveformGroup.add(anchorRight);
 			waveformGroup.add(anchorLeft);
-
-			anchorRight.on("dragmove", function (pos) {
-				anchorRight.y(0);
-
-				if (anchorRight.position().x >= waveformGroup.width()) {
-					frame.width(waveformGroup.width() - waveformGroup.clipX());
-					anchorRight.x(waveformGroup.width() - 10);
-					waveformGroup.clip({
-						width: 500,
-					});
-					return;
-				}
-				if (anchorRight.position().x - anchorLeft.position().x <= 20) {
-					frame.width(30);
-					anchorRight.x(20);
-					waveformGroup.clip({
-						width: 30,
-					});
-					return;
-				}
-				frame.width(anchorRight.position().x + 10 - waveformGroup.clipX());
-				waveformGroup.clip({
-					width: anchorRight.position().x + 10 - waveformGroup.clipX(),
-				});
-			});
-
-			anchorLeft.on("dragmove", function (pos) {
-				anchorLeft.y(0);
-
-				if (anchorLeft.position().x <= 0) {
-					frame.x(0);
-					frame.width(500);
-					anchorLeft.x(0);
-					waveformGroup.clipX(0);
-					return;
-				}
-				if (anchorRight.position().x - anchorLeft.position().x <= 20) {
-					frame.width(30);
-					frame.x(470);
-					anchorLeft.x(470);
-					waveformGroup.clip({
-						x: 470,
-					});
-					return;
-				}
-				frame.x(anchorLeft.position().x);
-				frame.width(anchorRight.position().x + 10 - anchorLeft.position().x);
-				waveformGroup.clip({
-					x: anchorLeft.position().x,
-					width: anchorRight.position().x + 10 - anchorLeft.position().x,
-				});
-			});
 			layer.add(waveformGroup);
 			layer.draw();
 		});
