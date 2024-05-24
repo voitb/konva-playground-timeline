@@ -8,6 +8,7 @@ import WaveformGenerator from "./WaveformComplete";
 import StageContainer from "./components/StageContainer";
 import KonvaWaveformShape from "./KonvaWaveformShape";
 import KonvaWaveformCliping from "./KonvaWaveformCliping";
+import KonvaWaveformReusableClass from "./KonvaWaveformReusableClass";
 
 function App() {
 	return (
@@ -17,7 +18,8 @@ function App() {
 			{/* <WaveformGenerator /> */}
 			{/* <KonvaWaveform /> */}
 			{/* <KonvaWaveformShape /> */}
-			<KonvaWaveformCliping />
+			{/* <KonvaWaveformCliping /> */}
+			<KonvaWaveformReusableClass />
 			{/* <StageContainer /> */}
 			{/* <KonvaOld /> */}
 		</div>
