@@ -40,30 +40,33 @@ class AnchorHandler {
 	}
 
 	initAnchors() {
-		this.anchorRight.on("dragmove", () => {
-			this.handleRightDrag();
-		});
+		this.anchorRight.on("dragmove", () => this.handleRightDrag());
+		this.anchorLeft.on("dragmove", () => this.handleLeftDrag());
 
-		this.anchorLeft.on("dragmove", () => {
-			this.handleLeftDrag();
+		this.group.on("mouseover", () => this.frame.stroke("red"));
+		this.group.on("mouseout", () => this.frame.stroke("blue"));
+		this.group.on("dragstart", () => {
+			this.group.moveToTop();
+			this.anchorRight.moveToTop();
+			this.anchorLeft.moveToTop();
 		});
 	}
 
 	handleRightDrag() {
 		this.anchorRight.y(0);
+		const maxRightX = this.group.width() - 10;
 
-		if (this.anchorRight.position().x >= this.group.width()) {
-			this.anchorRight.x(this.group.width() - 10);
+		if (this.anchorRight.position().x >= maxRightX) {
+			this.anchorRight.x(maxRightX);
 		}
 
 		if (this.anchorRight.position().x - this.anchorLeft.position().x <= 20) {
 			this.anchorRight.x(this.anchorLeft.position().x + 20);
 		}
 
-		this.frame.width(this.anchorRight.position().x + 10 - this.group.clipX());
-		this.group.clip({
-			width: this.anchorRight.position().x + 10 - this.group.clipX(),
-		});
+		const newWidth = this.anchorRight.position().x + 10 - this.group.clipX();
+		this.frame.width(newWidth);
+		this.group.clip({ width: newWidth });
 	}
 
 	handleLeftDrag() {
@@ -77,14 +80,11 @@ class AnchorHandler {
 			this.anchorLeft.x(this.anchorRight.position().x - 20);
 		}
 
-		this.frame.x(this.anchorLeft.position().x);
-		this.frame.width(
-			this.anchorRight.position().x + 10 - this.anchorLeft.position().x
-		);
-		this.group.clip({
-			x: this.anchorLeft.position().x,
-			width: this.anchorRight.position().x + 10 - this.anchorLeft.position().x,
-		});
+		const newX = this.anchorLeft.position().x;
+		const newWidth = this.anchorRight.position().x + 10 - newX;
+		this.frame.x(newX);
+		this.frame.width(newWidth);
+		this.group.clip({ x: newX, width: newWidth });
 	}
 
 	getElements() {
@@ -96,7 +96,7 @@ class AnchorHandler {
 	}
 }
 
-const WaveformGenerator = ({ stage, layer }) => {
+const WaveformGenerator = ({ layer }) => {
 	const drawWaveform = (arrayBuffer) => {
 		const context = new (window.AudioContext || window.webkitAudioContext)();
 
@@ -123,15 +123,10 @@ const WaveformGenerator = ({ stage, layer }) => {
 				width: frameWidth,
 				height: maxHeight,
 				clipX: 0,
-				clip: {
-					width: frameWidth,
-					height: maxHeight,
-				},
+				clip: { width: frameWidth, height: maxHeight },
 			});
 
-			const anchorHandler = new AnchorHandler(waveformGroup);
-
-			const { frame, anchorRight, anchorLeft } = anchorHandler.getElements();
+			new AnchorHandler(waveformGroup);
 
 			normalizedData.forEach((value, index) => {
 				const rectHeight = (value + 1) * (maxHeight / 2);
@@ -145,33 +140,6 @@ const WaveformGenerator = ({ stage, layer }) => {
 				waveformGroup.add(rect);
 			});
 
-			waveformGroup.on("mouseover", function () {
-				frame.stroke("red");
-				layer.draw();
-			});
-
-			waveformGroup.on("mouseout", function () {
-				frame.stroke("blue");
-				layer.draw();
-			});
-
-			waveformGroup.on("dragstart", function () {
-				waveformGroup.moveToTop();
-				anchorRight.moveToTop();
-				anchorLeft.moveToTop();
-				layer.draw();
-			});
-
-			waveformGroup.on("dragmove", function () {
-				layer.draw();
-			});
-
-			waveformGroup.on("dragend", function () {
-				layer.draw();
-			});
-
-			waveformGroup.add(anchorRight);
-			waveformGroup.add(anchorLeft);
 			layer.add(waveformGroup);
 			layer.draw();
 		});
@@ -181,9 +149,7 @@ const WaveformGenerator = ({ stage, layer }) => {
 		const file = event.target.files[0];
 		if (file) {
 			const reader = new FileReader();
-			reader.onload = (e) => {
-				drawWaveform(e.target.result);
-			};
+			reader.onload = (e) => drawWaveform(e.target.result);
 			reader.readAsArrayBuffer(file);
 		}
 	};
