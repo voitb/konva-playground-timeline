@@ -2,16 +2,18 @@ import React, { useRef, useEffect, useState } from "react";
 import Konva from "konva";
 
 class AnchorHandler {
-	constructor(group, width, height, clipWidth) {
+	constructor(group, width, height, clipWidth, snapHandler) {
 		this.width = width;
 		this.height = height;
 		this.group = group;
 		this.clipWidth = clipWidth;
+		this.snapHandler = snapHandler;
 		this.frame = this.createFrame();
 		this.anchorRight = this.createAnchor(clipWidth - 10, 0);
 		this.anchorLeft = this.createAnchor(0, 0);
 
 		this.initAnchors();
+		this.initSnap();
 
 		this.frame.moveToTop();
 		this.anchorRight.moveToTop();
@@ -59,37 +61,42 @@ class AnchorHandler {
 		});
 	}
 
+	initSnap() {
+		this.group.on("dragmove", () => {
+			this.snapHandler.showSnapIndicator(this.group.y());
+		});
+
+		this.group.on("dragend", () => {
+			const row = Math.floor(this.group.y() / this.snapHandler.rowHeight);
+			this.group.y(row * this.snapHandler.rowHeight);
+			this.snapHandler.hideSnapIndicator();
+			this.group.getLayer().draw();
+		});
+	}
+
 	handleRightDrag() {
 		this.anchorRight.y(0);
 		const maxRightX = this.group.width() - 10;
-		console.log(maxRightX, this, this.group.width());
-
 		if (this.anchorRight.position().x >= maxRightX) {
 			this.anchorRight.x(maxRightX);
 		}
-
 		if (this.anchorRight.position().x - this.anchorLeft.position().x <= 20) {
 			this.anchorRight.x(this.anchorLeft.position().x + 20);
 		}
-
 		const newWidth =
 			this.anchorRight.position().x + 10 - (this.group.clipX() || 0);
-		console.log(newWidth);
 		this.frame.width(newWidth);
 		this.group.clip({ width: newWidth });
 	}
 
 	handleLeftDrag() {
 		this.anchorLeft.y(0);
-
 		if (this.anchorLeft.position().x <= 0) {
 			this.anchorLeft.x(0);
 		}
-
 		if (this.anchorRight.position().x - this.anchorLeft.position().x <= 20) {
 			this.anchorLeft.x(this.anchorRight.position().x - 20);
 		}
-
 		const newX = this.anchorLeft.position().x;
 		const newWidth = this.anchorRight.position().x + 10 - newX;
 		this.frame.x(newX);
@@ -103,6 +110,41 @@ class AnchorHandler {
 			anchorRight: this.anchorRight,
 			anchorLeft: this.anchorLeft,
 		};
+	}
+}
+
+class SnapHandler {
+	constructor(layer, rowHeight) {
+		this.layer = layer;
+		this.rowHeight = rowHeight;
+		this.snapIndicator = this.createSnapIndicator();
+		layer.add(this.snapIndicator);
+	}
+
+	createSnapIndicator() {
+		return new Konva.Rect({
+			stroke: "blue",
+			strokeWidth: 2,
+			dash: [4, 4],
+			visible: false,
+		});
+	}
+
+	showSnapIndicator(y) {
+		const row = Math.floor(y / this.rowHeight);
+		const snapY = row * this.rowHeight;
+		this.snapIndicator.position({ x: 0, y: snapY });
+		this.snapIndicator.size({
+			width: this.layer.width(),
+			height: this.rowHeight,
+		});
+		this.snapIndicator.show();
+		this.layer.batchDraw();
+	}
+
+	hideSnapIndicator() {
+		this.snapIndicator.hide();
+		this.layer.batchDraw();
 	}
 }
 
@@ -139,7 +181,8 @@ const WaveformGenerator = ({ layer }) => {
 				waveformGroup,
 				waveformGroup.width(),
 				waveformGroup.height(),
-				waveformGroup.width()
+				waveformGroup.width(),
+				new SnapHandler(layer, 200) // assuming row height is 200
 			);
 
 			normalizedData.forEach((value, index) => {
@@ -208,18 +251,13 @@ const KonvaC = () => {
 		setLayer(newLayer);
 		stage.add(newLayer);
 
+		const rowHeight = 300; // You can adjust this value
+		const snapHandler = new SnapHandler(newLayer, rowHeight);
+
 		const images = [
 			"https://d2ndi552mc32nx.cloudfront.net/b/0ec3c2d1aab4d6a1ec44d2d56f374162/Sprite/s_0.jpg",
 			"https://d2ndi552mc32nx.cloudfront.net/b/0ec3c2d1aab4d6a1ec44d2d56f374162/Sprite/s_0.jpg",
 		];
-
-		const snapIndicator = new Konva.Rect({
-			stroke: "blue",
-			strokeWidth: 2,
-			dash: [4, 4],
-			visible: false,
-		});
-		newLayer.add(snapIndicator);
 
 		images.forEach((src, index) => {
 			const img = new window.Image();
@@ -245,7 +283,13 @@ const KonvaC = () => {
 				});
 
 				imageGroup.add(image);
-				new AnchorHandler(imageGroup, image.width(), image.height(), 300);
+				new AnchorHandler(
+					imageGroup,
+					image.width(),
+					image.height(),
+					300,
+					snapHandler
+				);
 
 				newLayer.add(imageGroup);
 				newLayer.draw();
